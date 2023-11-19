@@ -38,16 +38,42 @@ download() {
   (cd "$target"; youtube-dl -f m4a --write-thumbnail "https://youtu.be/$slug")
 }
 
+strip_slug() {
+  slug="$1"; shift || die 'Missing file'
+  read input
+  ext="${input##*.}"
+  prefix="${input%-$slug*}"
+  echo "$prefix.$ext"
+}
+
+track() {
+  number="$1"; shift || die 'Missing track number'
+  tracks="$1"; shift || die 'Missing tracks directory'
+  slug="$1"; shift || die 'Missing file'
+  target="$1"; shift || die 'Missing target'
+
+  m4a=( "$target"/*"-$slug.m4a" )
+  yoto=( "$target"/yoto-*"-$slug.png" )
+
+  [ -f "$m4a" ] && [ -f "$yoto" ] || die "Missing one of $m4a or $yoto for $slug"
+
+  ln "$m4a" "$tracks/$number-$(basename "$m4a" | strip_slug "$slug")"
+  ln "$yoto" "$tracks/$number-$(basename "$yoto" | strip_slug "$slug")"
+}
+
 main() {
   file="$1"; shift || die 'Missing file'
   target="$1"; shift || die 'Missing target'
+  tracks="$1"; shift || die 'Missing tracks'
 
+  idx=1
   cat "$file" | while read link; do
     slug="$(echo "$link" | grep -ho 'v=[a-zA-Z0-9_-]*' | sed 's/^v=//')"
     [ -n "$slug" ] || continue
     m4a "$slug" "$target"
     thumbnail "$slug" "$target"
-
+    track "$idx" "$tracks" "$slug" "$target"
+    idx=$((idx+1))
   done
 }
 
