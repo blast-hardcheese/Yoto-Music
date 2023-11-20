@@ -78,18 +78,3 @@ render_content_template() {
 }
 !
 }
-
-render_tracks() {
-  track=0
-  for file in tracks/*.m4a; do
-    status "Processing $file..."
-    title="${file%.m4a}"
-    title="${title#*-}"
-    icon_file="${file%.m4a}.png"
-    icon="$(upload_icon "$icon_file" | jq -r .displayIcon.mediaId)"
-
-    track=$((track + 1))
-    upload "$file" | render_track "$title" "$track" "$icon"
-  done | jq -sc .
-  status "Done."
-}

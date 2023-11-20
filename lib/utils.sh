@@ -8,7 +8,7 @@ status() {
 }
 
 strip_slug() {
-  slug="$1"; shift || die 'Missing file'
+  slug="$1"; shift || die 'Missing slug'
   read input
   ext="${input##*.}"
   prefix="${input%-$slug*}"

@@ -11,13 +11,44 @@ source "lib/download.sh"
 source "lib/render.sh"
 source "lib/utils.sh"
 
-persist() {
+render_tracks() {
+  file="$1"; shift || die 'Missing file'
+  target="$1"; shift || die 'Missing target'
+
+  track=1
+  cat "$file" | while read link; do
+    slug="$(echo "$link" | grep -ho 'v=[a-zA-Z0-9_-]*' | sed 's/^v=//')"
+    [ -n "$slug" ] || continue
+
+    status "Processing $track: $link..."
+
+    audio_file="$(m4a "$slug" "$target")"
+    icon_file="$(thumbnail "$slug" "$target")"
+    info_file="$(_info "$slug" "$target")"
+
+    title="$(cat "$info_file" | jq -r .title)"
+
+    icon="$(upload_icon "$icon_file" | jq -r .displayIcon.mediaId)"
+
+    upload_info="$(upload "$audio_file")"
+    echo "$upload_info" >&2
+    if [ -n "$upload_info" ]; then
+      echo "$upload_info" | render_track "$title" "$track" "$icon"
+    fi
+    track=$((track + 1))
+  done | jq -sc .
+  status "Done."
+}
+
+main() {
+  file="$1"; shift || die 'Missing file'
+  target="$1"; shift || die 'Missing target'
   cardId="$1"; shift || die 'Missing cardId'
 
   if [ -n "$CACHE" ] && [ -f "$CACHE" ]; then
     content="$(cat "$CACHE")"
   else
-    tracks="$(render_tracks)"
+    tracks="$(render_tracks "$file" "$target")"
     content="$(render_content_template "$cardId" | jq --argjson tracks "$tracks" '.content.chapters |= $tracks')"
     if [ -n "$CACHE" ]; then
       echo "$content" > "$CACHE"
@@ -26,44 +57,6 @@ persist() {
 
   echo "$content" | render_icons | persist_icons
   echo "$content" | persist_content
-}
-
-track() {
-  number="$1"; shift || die 'Missing track number'
-  tracks="$1"; shift || die 'Missing tracks directory'
-  slug="$1"; shift || die 'Missing file'
-  target="$1"; shift || die 'Missing target'
-
-  number="$(printf %02d "$number")"
-  m4a=( "$target"/*"-$slug.m4a" )
-  yoto=( "$target"/*"-$slug-yoto.png" )
-
-  [ -f "$m4a" ] && [ -f "$yoto" ] || die "Missing one of $m4a or $yoto for $slug"
-
-  ln "$m4a" "$tracks/$number-$(basename "$m4a" | strip_slug "$slug")"
-  ln "$yoto" "$tracks/$number-$(basename "$yoto" | strip_slug "$slug")"
-}
-
-main() {
-  file="$1"; shift || die 'Missing file'
-  target="$1"; shift || die 'Missing target'
-  tracks="$1"; shift || die 'Missing tracks'
-
-  idx=1
-  cat "$file" | while read link; do
-    slug="$(echo "$link" | grep -ho 'v=[a-zA-Z0-9_-]*' | sed 's/^v=//')"
-    [ -n "$slug" ] || continue
-    m4a "$slug" "$target"
-    thumbnail "$slug" "$target"
-    track "$idx" "$tracks" "$slug" "$target"
-    idx=$((idx+1))
-  done
-}
-
-main() {
-  cardId="$1"; shift || die 'Missing cardId'
-
-  persist "$cardId"
 }
 
 main "$@"

@@ -61,23 +61,28 @@ upload() {
     _upload "$upload_url" "$file"
     status " Done!"
 
-    transcoded_sha=
+    transcoded_info=
     status -n "Transcoding..."
-    while [ -z "$transcoded_sha" ]; do
-      transcoded_sha="$(transcoded "$sha" | jq -r '.transcode // ""')"
+    while [ -z "$transcoded_info" ]; do
+      transcoded_info="$(transcoded "$sha" | jq -r '.transcode // ""')"
       status -n .
       sleep 2
     done
     status " Done!"
   else
-    transcoded_sha="$(transcoded "$sha" | jq -r '.transcode // ""')"
+    transcoded_info="$(transcoded "$sha" | jq -r '.transcode // ""')"
   fi
-  echo "$transcoded_sha"
+  if [ -n "$(echo "$transcoded_info" | jq -r '.error // ""')" ]; then
+    status "There was a problem processing $file"
+  else
+    echo "$transcoded_info"
+  fi
 }
 
 _upload() {
   upload_url="$1"; shift || die 'Missing upload_url'
   file="$1"; shift || die 'Missing file'
+  status "Actually uploading $file"
   curl -s "$upload_url" \
     -X 'PUT' \
     -H 'Accept: application/json, text/plain, */*' \
