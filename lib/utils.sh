@@ -7,6 +7,14 @@ status() {
   echo "$@" >&2
 }
 
+strip_slug() {
+  slug="$1"; shift || die 'Missing file'
+  read input
+  ext="${input##*.}"
+  prefix="${input%-$slug*}"
+  echo "$prefix.$ext"
+}
+
 urlencode() {
   python <<!
 from urllib import parse
