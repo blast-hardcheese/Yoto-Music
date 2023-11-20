@@ -44,8 +44,11 @@ render_track() {
 
 render_content_template() {
   cardId="$1"; shift || die 'Missing cardId'
+  title="$1"; shift || die 'Missing title'
 
-  cat <<!
+  jq \
+    --arg title "$title" \
+    '.title |= $title' <<!
 {
   "title": "Classic Rock (Test)",
   "content": {

@@ -44,12 +44,13 @@ main() {
   file="$1"; shift || die 'Missing file'
   target="$1"; shift || die 'Missing target'
   cardId="$1"; shift || die 'Missing cardId'
+  title="$1"; shift || die 'Missing title'
 
   if [ -n "$CACHE" ] && [ -f "$CACHE" ]; then
     content="$(cat "$CACHE")"
   else
     tracks="$(render_tracks "$file" "$target")"
-    content="$(render_content_template "$cardId" | jq --argjson tracks "$tracks" '.content.chapters |= $tracks')"
+    content="$(render_content_template "$cardId" "$title" | jq --argjson tracks "$tracks" '.content.chapters |= $tracks')"
     if [ -n "$CACHE" ]; then
       echo "$content" > "$CACHE"
     fi
