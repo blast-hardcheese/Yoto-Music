@@ -19,13 +19,13 @@ thumbnail() {
   slug="$1"; shift || die 'Missing file'
   target="$1"; shift || die 'Missing target'
 
-  yoto=( "$target"/yoto-*"-$slug.png" )
+  yoto=( "$target"/*"-$slug-yoto.png" )
   if [ -f "${yoto}" ]; then
     echo "Found ${yoto}, skipping"
   else
     for src in "$target"/*"-$slug."{webp,png,jpg}; do
       [ -f "$src" ] || continue
-      dest="$target/yoto-$(basename "${src%.*}.png")"
+      dest="$target/$(basename "${src%.*}-yoto.png")"
       echo "Converting $src into $dest"
       convert "$src" -resize 16x16^ -gravity Center -extent 16x16 "$dest" && break
     done
@@ -52,8 +52,9 @@ track() {
   slug="$1"; shift || die 'Missing file'
   target="$1"; shift || die 'Missing target'
 
+  number="$(printf %02d "$number")"
   m4a=( "$target"/*"-$slug.m4a" )
-  yoto=( "$target"/yoto-*"-$slug.png" )
+  yoto=( "$target"/*"-$slug-yoto.png" )
 
   [ -f "$m4a" ] && [ -f "$yoto" ] || die "Missing one of $m4a or $yoto for $slug"
 
