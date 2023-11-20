@@ -1,31 +1,3 @@
-#!/usr/bin/env bash
-
-set -e
-
-if [ -e .env ]; then
-  source ".env"
-fi
-
-die() {
-  echo "ERROR: $@" >&2
-  exit 1
-}
-
-status() {
-  echo "$@" >&2
-}
-
-urlencode() {
-  python <<!
-from urllib import parse
-
-import sys
-
-for line in sys.stdin.readlines():
-  print(parse.quote_plus(line.strip()))
-!
-}
-
 api() {
   path="$1"; shift || die 'Missing path'
   curl -s 'https://api.yotoplay.com/'"$path" \
@@ -71,14 +43,6 @@ delete_icon() {
   icon_id="$1"; shift || die 'Missing icon_id'
   api "media/displayIcon/$icon_id" \
   -X 'DELETE'
-}
-
-websha() {
-  file="$1"; shift || die 'Missing file'
-  sha256sum -b "$file" \
-    | xxd -r -p \
-    | base64 \
-    | sed 's/\+/-/g; s/\//_/g; s/=*$//'
 }
 
 transcoded() {
@@ -133,11 +97,6 @@ _upload() {
     --data-binary @"$file"
 }
 
-render_icons() {
-  # Input comes from the final card structure
-  jq '.content.chapters | map(.tracks[0].display.icon16x16 | sub("^yoto:#"; "")) | sort | unique | { icons: map({ mediaId: . }) }'
-}
-
 persist_icons() {
   status -n 'Persisting icons...'
   res="$(api 'media/user/icons' \
@@ -146,97 +105,6 @@ persist_icons() {
   status ' Done.'
 }
 
-render_track() {
-  title="$1"; shift || die 'Missing title'
-  track="$1"; shift || die 'Missing track'
-  icon="$1"; shift || die 'Missing icon'
-  key="$(printf "%02d" "$((track-1))")"
-
-  jq \
-    --arg key "$key" \
-    --arg title "$title" \
-    --arg track "$track" \
-    --arg icon "$icon" \
-    '
-  {
-    "key": $key,
-    "title": $title,
-    "overlayLabel": "1",
-    "tracks": [
-      {
-        "key": "01",
-        title: $title,
-        format: .transcodedInfo.format,
-        "trackUrl": ("yoto:#" + .transcodedSha256),
-        "type": "audio",
-        "overlayLabel": $track,
-        "display": {
-          "icon16x16": ("yoto:#" + $icon)
-        },
-        "duration": .transcodedInfo.duration,
-        "fileSize": .transcodedInfo.fileSize,
-        "channels": .transcodedInfo.channels
-      }
-    ],
-    "display": {
-      "icon16x16": "yoto:#..."
-    }
-  }
-'
-}
-
-
-render_content_template() {
-  cardId="$1"; shift || die 'Missing cardId'
-
-  cat <<!
-{
-  "title": "Classic Rock (Test)",
-  "content": {
-    "activity": "yoto_Player",
-    "chapters": [
-    ],
-    "restricted": true,
-    "config": {
-      "onlineOnly": false
-    },
-    "version": "1",
-    "editSettings": {}
-  },
-  "metadata": {
-    "cover": {
-      "imageL": "https://cdn.yoto.io/myo-cover/star_grapefruit.gif"
-    },
-    "media": {
-      "fileSize": 8287388,
-      "duration": 510,
-      "readableDuration": "0h 8m 30s",
-      "readableFileSize": 7.9,
-      "hasStreams": false
-    }
-  },
-  "cardId": "${cardId}",
-  "userId": "${YOTO_USER_ID}",
-  "createdAt": "2023-11-20T04:59:25.955Z",
-  "updatedAt": "2023-11-20T05:06:21.759Z"
-}
-!
-}
-
-render_tracks() {
-  track=0
-  for file in tracks/*.m4a; do
-    status "Processing $file..."
-    title="${file%.m4a}"
-    title="${title#*-}"
-    icon_file="${file%.m4a}.png"
-    icon="$(upload_icon "$icon_file" | jq -r .displayIcon.mediaId)"
-
-    track=$((track + 1))
-    upload "$file" | render_track "$title" "$track" "$icon"
-  done | jq -sc .
-  status "Done."
-}
 
 persist_content() {
   status -n 'Persisting content...'
@@ -246,26 +114,8 @@ persist_content() {
   status ' Done.'
 }
 
-persist() {
-  cardId="$1"; shift || die 'Missing cardId'
-
-  if [ -n "$CACHE" ] && [ -f "$CACHE" ]; then
-    content="$(cat "$CACHE")"
-  else
-    tracks="$(render_tracks)"
-    content="$(render_content_template "$cardId" | jq --argjson tracks "$tracks" '.content.chapters |= $tracks')"
-    if [ -n "$CACHE" ]; then
-      echo "$content" > "$CACHE"
-    fi
-  fi
-
-  echo "$content" | render_icons | persist_icons
-  echo "$content" | persist_content
-}
-
+# Examples:
 # card "$(cards | jq -r '.cards[0].cardId')"
 # my_icons
 # upload "./tracks/19-Cherokee Bend.m4a"
 # upload_icon "./tracks/16-yoto-Renegade.png"
-
-persist "$@"
